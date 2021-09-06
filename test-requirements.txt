@@ -1,0 +1,12 @@
+bandit==1.7.0
+black==21.8b0
+coverage[toml]==5.5
+flake8==3.9.2
+flake8-bugbear==21.4.3
+flake8-docstrings==1.6.0
+ipython==7.27.0
+isort==5.9.3
+pdbpp==0.10.3
+stestr==3.2.0
+testscenarios==0.5.0
+testtools==2.5.0

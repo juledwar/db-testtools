@@ -1,0 +1,5 @@
+include README.rst
+include requirements.txt
+recursive-include dbtesttools *.py
+prune dbtesttools/tests
+prune dbtesttools/testing
