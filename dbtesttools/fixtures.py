@@ -1,223 +1,17 @@
 # Copyright (c) 2021 Cisco Systems, Inc. and its affiliates
 # All rights reserved.
 
-import abc
 import importlib
 import itertools
 import os
-import random
-import socket
+import pkgutil
 import sys
-from contextlib import closing
 
-import docker
 import fixtures
-import psycopg2
 import sqlalchemy as sa
 import testresources
-from retry import retry
 
 models_loaded = False
-
-
-DEFAULT_INIT_SQL = """
-CREATE DATABASE testing WITH
-    ENCODING = 'UTF8'
-    LC_COLLATE = 'en_US.utf8'
-    LC_CTYPE = 'en_US.utf8';
-CREATE USER testing WITH ENCRYPTED PASSWORD 'testing';
-GRANT ALL PRIVILEGES ON DATABASE testing TO testing;
-"""
-
-
-class EngineFixture(fixtures.Fixture, metaclass=abc.ABCMeta):
-    """Base class for engine fixtures.
-
-    Fixtures are responsible for starting a complete database server,
-    and to start/rollback an 'outer' transaction. Outer transactions
-    are required to keep an effective save point so that any part of the
-    test suite may issue commit and rollback requests.
-    """
-
-    @abc.abstractmethod
-    def connect(self) -> sa.engine.base.Connection:
-        """Return a new connection object from the Engine."""
-        pass
-
-    @property
-    @abc.abstractmethod
-    def has_savepoint(self) -> bool:
-        """Define whether the engine can do savepoints or not.
-
-        If an engine fixture cannot do savepoints, it must be torn down
-        and re-made between tests. If it can, it tells the
-        DatabaseResource that it supports mid-txn rollbacks via the
-        savepoint.
-        """
-        pass
-
-
-class SqliteMemoryFixture(EngineFixture):
-    """A Sqlite memory-based DB fixture.
-
-    :param future: The future flag passed directly to SQLAlchemy's
-        `create_engine`.
-
-    Throw all other args/kwargs on the floor.
-    (For compatibility with PyCharm's built-in test runner)
-    """
-
-    def __init__(self, *args, future=False, **kwargs):
-        self.future = future
-        super().__init__()
-
-    def setUp(self):
-        super().setUp()
-        self.engine = sa.create_engine(
-            'sqlite:///:memory:', future=self.future
-        )
-        self.connection = self.connect()
-        self.connection.execute(sa.text('PRAGMA foreign_keys = ON'))
-        self.addCleanup(self.connection.close)
-
-    def connect(self):
-        """Return a connection object from the engine."""
-        return self.engine.connect()
-
-    @property
-    def has_savepoint(self):
-        # This forces the database reasource to be rebuilt for every test.
-        # Sqlite won't do nested transactions properly, so just throw the DB
-        # away and start again.
-        return False
-
-
-class PostgresContainerFixture(EngineFixture):
-    """A Postgres Docker-based database fixture.
-
-    :param image: Name of the postgres docker image to pull and use.
-    :param name: base name prefix for all started container instances.
-    :param init_sql: Optional string of SQL to run in the newly-created
-        database. Defaults to setting up a database/user called 'testing'
-        with UTF8 encoding and collation.
-    :param pg_data: PGDATA to pass to the container, defaults to /tmp/pgdata
-    :param isolation: Optional default isolation level to use in the database.
-    :param future: Passed directly to SQLAlchemy's `create_engine`.
-        If true, activates the v2 API. Defaults to False.
-    """
-
-    def __init__(
-        self,
-        # Using the larger non-alpine image causes sort-order errors
-        # because of locale collation differences.
-        # image='postgres:11.4',
-        image='postgres:11.11-alpine',
-        name='testdb',
-        init_sql=None,
-        pg_data='/tmp/pgdata',  # nosec
-        isolation=None,
-        future=False,
-    ):
-        super().__init__()
-        self.image = image
-        self.name = name
-        if init_sql is None:
-            init_sql = DEFAULT_INIT_SQL
-        self.init_sql = init_sql
-        self.pg_data = pg_data
-        self.isolation = isolation
-        self.future = future
-
-    def connect(self):
-        """Return a connection object from the engine."""
-        return self.engine.connect()
-
-    @property
-    def has_savepoint(self):
-        # PG can roll back transactions, so is never dirty.
-        return True
-
-    # Internal methods below here.
-
-    def setUp(self):
-        """Do all the work to bring up a working Postgres fixture."""
-        super().setUp()
-        self.client = docker.from_env()
-        self.pull_image()
-        self.find_free_port()
-        self.start_container()
-        self.wait_for_pg_start()
-        self.set_up_test_database()
-        self.engine = sa.create_engine(
-            'postgresql://testing:testing@127.0.0.1:{port}/testing'.format(
-                port=self.local_port
-            ),
-            isolation_level=self.isolation,
-            future=self.future,
-        )
-        self.addCleanup(self.container.kill)
-
-    def pull_image(self):
-        try:
-            self.client.images.get(self.image)
-        except docker.errors.ImageNotFound:
-            print("Pulling Postgres image ...", file=sys.stderr)
-            self.client.images.pull(self.image)
-
-    def start_container(self):
-        env = dict(POSTGRES_PASSWORD='postgres', PGDATA=self.pg_data)  # nosec
-        ports = {'5432': self.local_port}
-        print("Starting Postgres container ...", file=sys.stderr)
-        # Randomize the name as threaded tests will create multiple containers.
-        name = self.name + '-{}'.format(random.randint(1, 1000))  # nosec
-        self.container = self.client.containers.run(
-            self.image,
-            detach=True,
-            auto_remove=True,
-            environment=env,
-            name=name,
-            network_mode='bridge',
-            ports=ports,
-            remove=True,
-        )
-
-    def find_free_port(self):
-        """Find a free port on which to run Postgres locally."""
-        # This initially binds to port 0, which makes the kernel pick a
-        # real free port. We close the socket after determnining which port
-        # that was.
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-            s.bind(('localhost', 0))
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.local_port = s.getsockname()[1]
-            print("Using port {}".format(self.local_port), file=sys.stderr)
-
-    def set_up_test_database(self):
-        c = psycopg2.connect(
-            "dbname='postgres' "
-            "user='postgres' host='127.0.0.1' port='{port}' "
-            "password='postgres' connect_timeout=1".format(
-                port=self.local_port
-            )
-        )
-        c.autocommit = True
-        cur = c.cursor()
-        for stmt in self.init_sql.split(';'):
-            if stmt.strip():
-                cur.execute(stmt)
-        cur.close()
-        c.close()
-
-    @retry(psycopg2.OperationalError, tries=30, delay=1)
-    def wait_for_pg_start(self):
-        c = psycopg2.connect(
-            "user='postgres' host='127.0.0.1' port='{port}'"
-            "password='postgres' connect_timeout=1".format(
-                port=self.local_port
-            )
-        )
-        c.close()
-        print("Postgres is up", file=sys.stderr)
 
 
 class DatabaseResource(testresources.TestResourceManager):
@@ -242,6 +36,21 @@ class DatabaseResource(testresources.TestResourceManager):
         models. The models will be imported at the right moment when
         bringing up the DB.
         e.g. 'myproject.schema.models'
+
+    :param engine_fixture_name: (str) The name of the database engine
+        driver to use for this DatabaseResource. It will be searched for
+        under the engines module and automatically imported. Must be a
+        concrete instance of `EngineFixture`. Raises AttributeError if the
+        name is not found. Currently available engines are
+        'SqliteMemoryFixture' and 'PostgresContainerFixture'.
+        NOTE: This can be overridden by setting the TEST_ENGINE_FIXTURE
+        environment variable.
+
+    :param engine_fixture_kwargs: A dict of kwargs to pass to the above engine
+        fixture when it is instantiated.
+
+    :param future: (bool) Passed to the engine fixture when instantiating; used
+        to activate future mode on the SQLAlchemy engine (v2 mode).
 
     :param patch_query_property: If True, override the `query` property on
         ModelBase so that it uses the Session registry's `query_property`.
@@ -297,12 +106,17 @@ class DatabaseResource(testresources.TestResourceManager):
 
     def pick_engine_fixture(self):
         env_name = os.environ.get('TEST_ENGINE_FIXTURE', None)
-        module = sys.modules[globals()['__name__']]
         if env_name is not None:
             self.engine_fixture_name = env_name
-        return getattr(module, self.engine_fixture_name)(
-            **self.engine_fixture_kwargs
-        )
+        import dbtesttools.engines
+
+        for _, module, _ in pkgutil.iter_modules(dbtesttools.engines.__path__):
+            mod = importlib.import_module(f'dbtesttools.engines.{module}')
+
+            for name, obj in mod.__dict__.items():
+                if name == self.engine_fixture_name:
+                    return obj(**self.engine_fixture_kwargs)
+        raise AttributeError(f'{self.engine_fixture_name} not found')
 
     def initialize_engine(self):
         self.db = self.pick_engine_fixture()

@@ -1,0 +1,23 @@
+{
+    "python.pythonPath": "${workspaceFolder}/.tox/py3/bin/python3",
+    "python.formatting.provider": "black",
+    "python.formatting.blackArgs": [
+        "--line-length",
+        "79"
+    ],
+    "python.linting.flake8Enabled": true,
+    "python.linting.enabled": true,
+    "python.testing.pytestEnabled": false,
+    "python.testing.nosetestsEnabled": false,
+    "python.testing.unittestEnabled": true,
+    "files.watcherExclude": {
+        "**/.coverage/**": true,
+        "**/.eggs": true,
+        "**/.stestr/**": true,
+        "**/.testrepository/**": true,
+        "**/.tox/**": true
+    },
+    "git.allowForcePush": true,
+    "editor.wordWrapColumn": 79,
+    "vim.textwidth": 79,
+}
