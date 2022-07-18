@@ -14,7 +14,7 @@ after each test completes.
 Requirements
 ------------
 
-Python3.7 and beyond should work.
+Python 3.7 and beyond should work.
 
 Quickstart
 ----------
@@ -82,7 +82,7 @@ this fixture.
 Help needed!
 ------------
 This fixture suite is currently not tested itself and would benefit from
-anyone willing to contribute some unit tests.However, iIt has been in
+anyone willing to contribute some unit tests. However, it has been in
 use daily on a large project at Cisco for the last 2 years, and is very
 stable.
 
