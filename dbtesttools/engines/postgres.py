@@ -1,10 +1,11 @@
 # Copyright (c) 2021 Cisco Systems, Inc. and its affiliates
 # All rights reserved.
 
-import random
+import os
 import socket
 import sys
 from contextlib import closing
+from itertools import count
 
 import docker
 import psycopg2
@@ -21,6 +22,8 @@ CREATE DATABASE testing WITH
 CREATE USER testing WITH ENCRYPTED PASSWORD 'testing';
 GRANT ALL PRIVILEGES ON DATABASE testing TO testing;
 """
+
+NEXT_ID = count(1)
 
 
 class PostgresContainerFixture(EngineFixture):
@@ -99,8 +102,8 @@ class PostgresContainerFixture(EngineFixture):
         env = dict(POSTGRES_PASSWORD='postgres', PGDATA=self.pg_data)  # nosec
         ports = {'5432': self.local_port}
         print("Starting Postgres container ...", file=sys.stderr)
-        # Randomize the name as threaded tests will create multiple containers.
-        name = self.name + '-{}'.format(random.randint(1, 1000))  # nosec
+        # Uniq-ify the name as threaded tests will create multiple containers.
+        name = '{}-{}.{}'.format(self.name, os.getpid(), next(NEXT_ID))
         self.container = self.client.containers.run(
             self.image,
             detach=True,
