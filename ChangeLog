@@ -1,6 +1,13 @@
 CHANGES
 =======
 
+2023.01.27
+----------
+
+* Improve uniqueness of PostgreSQL container names
+* Very important readme typo changes
+* Update Black to 22.0.3 to fix build
+
 2021.10.27
 ----------
 
