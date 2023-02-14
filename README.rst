@@ -78,17 +78,28 @@ The PostgresContainerFixture starts its own Postgres instance in a local
 Docker container. Therefore you must have Docker installed before using
 this fixture.
 
+If you are already running inside Docker you will need to start the
+container with `--network-"host"` so that 127.0.0.1 routes to the started
+PG containers. You will need to do up to two extra things:
+ 1. Bind mount /var/run/docker.sock to the container so docker clients
+    can create sibling containers on the host.
+ 2. If you cannot use host networking, supply the IP address of the
+    host's network bridge (usually docker0, etc), so that the fixture
+    knows where to find the PG server. The IP address is either
+    supplied via the constructor to `PostgresContainerFixture` or you
+    can set the DBTESTTOOLS_PG_IP_ADDR environment variable.
+
 
 Help needed!
 ------------
 This fixture suite is currently not tested itself and would benefit from
 anyone willing to contribute some unit tests. However, it has been in
-use daily on a large project at Cisco for the last 2 years, and is very
+use daily on a large project at Cisco for a few years now, and is very
 stable.
 
 
 Copyright
 ---------
 
-db-testtools is copyright (c) 2021 Cisco Systems, Inc. and its affiliates
+db-testtools is copyright (c) 2021-2023 Cisco Systems, Inc. and its affiliates
 All rights reserved.

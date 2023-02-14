@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Cisco Systems, Inc. and its affiliates
+# Copyright (c) 2021-2023 Cisco Systems, Inc. and its affiliates
 # All rights reserved.
 
 import os
@@ -38,6 +38,14 @@ class PostgresContainerFixture(EngineFixture):
     :param isolation: Optional default isolation level to use in the database.
     :param future: Passed directly to SQLAlchemy's `create_engine`.
         If true, activates the v2 API. Defaults to False.
+    :param ip_address: The address on which to contact the PG server after it
+        comes up. This defaults to 127.0.0.1, which works if you are
+        running your fixture via Docker on the same host, however if
+        you're running inside a container already, the Postgres
+        container that is brought up will have the IP address of the
+        container's host. The DBTESTTOOLS_PG_IP_ADDR environment
+        variable can also be used to override (this arg takes precedence
+        though).
     """
 
     def __init__(
@@ -51,6 +59,7 @@ class PostgresContainerFixture(EngineFixture):
         pg_data='/tmp/pgdata',  # nosec
         isolation=None,
         future=False,
+        ip_address=None,
     ):
         super().__init__()
         self.image = image
@@ -61,6 +70,9 @@ class PostgresContainerFixture(EngineFixture):
         self.pg_data = pg_data
         self.isolation = isolation
         self.future = future
+        self.ip_address = ip_address or os.getenv(
+            'DBTESTTOOLS_PG_IP_ADDR', '127.0.0.1'
+        )
 
     def connect(self):
         """Return a connection object from the engine."""
@@ -83,8 +95,8 @@ class PostgresContainerFixture(EngineFixture):
         self.wait_for_pg_start()
         self.set_up_test_database()
         self.engine = sa.create_engine(
-            'postgresql://testing:testing@127.0.0.1:{port}/testing'.format(
-                port=self.local_port
+            'postgresql://testing:testing@{ip}:{port}/testing'.format(
+                ip=self.ip_address, port=self.local_port
             ),
             isolation_level=self.isolation,
             future=self.future,
@@ -129,9 +141,9 @@ class PostgresContainerFixture(EngineFixture):
     def set_up_test_database(self):
         c = psycopg2.connect(
             "dbname='postgres' "
-            "user='postgres' host='127.0.0.1' port='{port}' "
+            "user='postgres' host='{ip}' port='{port}' "
             "password='postgres' connect_timeout=1".format(
-                port=self.local_port
+                ip=self.ip_address, port=self.local_port
             )
         )
         c.autocommit = True
@@ -145,9 +157,9 @@ class PostgresContainerFixture(EngineFixture):
     @retry(psycopg2.OperationalError, tries=30, delay=1)
     def wait_for_pg_start(self):
         c = psycopg2.connect(
-            "user='postgres' host='127.0.0.1' port='{port}'"
+            "user='postgres' host='{ip}' port='{port}'"
             "password='postgres' connect_timeout=1".format(
-                port=self.local_port
+                ip=self.ip_address, port=self.local_port
             )
         )
         c.close()
