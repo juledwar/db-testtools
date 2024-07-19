@@ -28,6 +28,26 @@ omit = [
 
 [tool.ruff]
 line-length = 79
+output-format = "full"
+exclude = [
+    ".git",
+    ".tox",
+    "__pycache__",
+    "alembic",
+    "bin",
+    "lib",
+    "build",
+    "dist",
+    ".eggs",
+]
 
 [tool.ruff.lint]
-select = ["I", "S"]
+select = ["B", "C9", "D", "E", "F", "I", "S", "W"]
+ignore = [
+    "D10",  # ignore missing docstrings (for now)
+    "D202", # No blank lines allowed after function docstring (caused by Black)
+    "D203", # Allow One Blank Line Before Class
+    "D213", # Allow "Multi-line docstring summary should start at the second line"
+    "E203", # Whitespace before ':' (caused by Black)
+]
+mccabe.max-complexity = 13
