@@ -8,6 +8,7 @@ flake8-docstrings==1.6.0
 ipython==7.28.0
 isort==5.9.3
 pdbpp==0.10.3
+ruff>=0.5.3
 stestr==3.2.1
 testscenarios==0.5.0
 testtools==2.5.0
