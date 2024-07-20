@@ -111,9 +111,7 @@ class PostgresContainerFixture(EngineFixture):
             self.client.images.pull(self.image)
 
     def start_container(self):
-        env = dict(
-            POSTGRES_PASSWORD='postgres', PGDATA=self.pg_data  # noqa: S106
-        )
+        env = dict(POSTGRES_PASSWORD='postgres', PGDATA=self.pg_data)  # noqa: S106
         ports = {'5432': self.local_port}
         print("Starting Postgres container ...", file=sys.stderr)
         # Uniq-ify the name as threaded tests will create multiple containers.
