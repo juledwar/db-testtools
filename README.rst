@@ -82,6 +82,7 @@ fixture is known to work all the way back to v11.
 If you are already running inside Docker you will need to start the
 container with `--network-"host"` so that 127.0.0.1 routes to the started
 PG containers. You will need to do up to two extra things:
+
  1. Bind mount /var/run/docker.sock to the container so docker clients
     can create sibling containers on the host.
  2. If you cannot use host networking, supply the IP address of the
