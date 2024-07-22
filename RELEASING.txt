@@ -3,14 +3,11 @@ To release a new version of db-testtools:
  1. Tag the current revision with the required release number, e.g.
     `git tag 2021.09.29`
  2. Build the package:
-    `tox -e build-python-package`
- 3. This will generate a new ChangeLog file. It needs to be committed as
-    a new revision.
- 4. After committing, move the tag: `git tag -f 2021.09.29`
- 5. Build the package again because PBR.
- 6. Upload the package to testpyi first to make sure it is ok:
-    `tox -e testpypi dist/*2021.9.29*`
- 7. If that looks ok, upload to the real pypi:
-    `tox -e pypi dist/*2021.9.29*`
- 8. Push the new tag to Github:
+    `hatch build`
+ 3. Upload the package to testpyi first to make sure it is ok:
+    `hatch run testpypi dist/*2021.9.29*`
+ 4. If that looks ok, upload to the real pypi:
+    `hatch run pypi dist/*2021.9.29*`
+ 5. Push the new tag to Github:
     `git push origin 2021.09.29`
+ 6. Make a Github release

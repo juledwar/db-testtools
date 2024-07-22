@@ -1,4 +1,7 @@
-.tox/
+.hatch/
+.stestr/
 db_testtools.egg-info/
 __pycache__/
 *.pyc
+dbtesttools/_version.py
+dist/

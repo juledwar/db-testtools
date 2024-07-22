@@ -70,7 +70,7 @@ class DatabaseResource(testresources.TestResourceManager):
         ModelBase,
         models_module,  # NOSONAR
         patch_query_property=False,
-        engine_fixture_name='SqliteMemoryFixture',
+        engine_fixture_name="SqliteMemoryFixture",
         sessionmaker_class=None,
         engine_fixture_kwargs=None,
         future=False,
@@ -83,7 +83,7 @@ class DatabaseResource(testresources.TestResourceManager):
         self.sessionmaker_class = sessionmaker_class
         self.engine_fixture_kwargs = engine_fixture_kwargs or {}
         self.future = future
-        self.engine_fixture_kwargs['future'] = self.future
+        self.engine_fixture_kwargs["future"] = self.future
 
     def make(self, dep_resources):
         print("Creating new database resource...", file=sys.stderr)
@@ -101,22 +101,21 @@ class DatabaseResource(testresources.TestResourceManager):
 
     def clean(self, resource):
         print("Cleaning up database resource...", file=sys.stderr)
-        self.drop_tables(self.engine)
         self.db.cleanUp()
 
     def pick_engine_fixture(self):
-        env_name = os.environ.get('TEST_ENGINE_FIXTURE', None)
+        env_name = os.environ.get("TEST_ENGINE_FIXTURE", None)
         if env_name is not None:
             self.engine_fixture_name = env_name
         import dbtesttools.engines
 
         for _, module, _ in pkgutil.iter_modules(dbtesttools.engines.__path__):
-            mod = importlib.import_module(f'dbtesttools.engines.{module}')
+            mod = importlib.import_module(f"dbtesttools.engines.{module}")
 
             for name, obj in mod.__dict__.items():
                 if name == self.engine_fixture_name:
                     return obj(**self.engine_fixture_kwargs)
-        raise AttributeError(f'{self.engine_fixture_name} not found')
+        raise AttributeError(f"{self.engine_fixture_name} not found")
 
     def initialize_engine(self):
         self.db = self.pick_engine_fixture()
@@ -176,10 +175,6 @@ class DatabaseResource(testresources.TestResourceManager):
     def create_tables(self, engine):
         metadata = self.ModelBase.metadata
         metadata.create_all(bind=engine)
-
-    def drop_tables(self, engine):
-        metadata = self.ModelBase.metadata
-        metadata.drop_all(bind=engine)
 
     def rollback_transaction(self, txn):
         """Roll back an in-progress transaction.

@@ -21,6 +21,8 @@ CREATE DATABASE testing WITH
     LC_CTYPE = 'en_US.utf8';
 CREATE USER testing WITH ENCRYPTED PASSWORD 'testing';
 GRANT ALL PRIVILEGES ON DATABASE testing TO testing;
+GRANT ALL ON SCHEMA public TO testing;
+ALTER DATABASE testing OWNER TO testing;
 """
 
 NEXT_ID = count(1)
@@ -53,10 +55,10 @@ class PostgresContainerFixture(EngineFixture):
         # Using the larger non-alpine image causes sort-order errors
         # because of locale collation differences.
         # image='postgres:11.4',
-        image='postgres:11.11-alpine',
-        name='testdb',
+        image="postgres:16.3-alpine",
+        name="testdb",
         init_sql=None,
-        pg_data='/tmp/pgdata',  # noqa: S108
+        pg_data="/tmp/pgdata",  # noqa: S108
         isolation=None,
         future=False,
         ip_address=None,
@@ -71,7 +73,7 @@ class PostgresContainerFixture(EngineFixture):
         self.isolation = isolation
         self.future = future
         self.ip_address = ip_address or os.getenv(
-            'DBTESTTOOLS_PG_IP_ADDR', '127.0.0.1'
+            "DBTESTTOOLS_PG_IP_ADDR", "127.0.0.1"
         )
 
     def connect(self):
@@ -95,7 +97,7 @@ class PostgresContainerFixture(EngineFixture):
         self.wait_for_pg_start()
         self.set_up_test_database()
         self.engine = sa.create_engine(
-            'postgresql://testing:testing@{ip}:{port}/testing'.format(
+            "postgresql://testing:testing@{ip}:{port}/testing".format(
                 ip=self.ip_address, port=self.local_port
             ),
             isolation_level=self.isolation,
@@ -111,18 +113,18 @@ class PostgresContainerFixture(EngineFixture):
             self.client.images.pull(self.image)
 
     def start_container(self):
-        env = dict(POSTGRES_PASSWORD='postgres', PGDATA=self.pg_data)  # noqa: S106
-        ports = {'5432': self.local_port}
+        env = dict(POSTGRES_PASSWORD="postgres", PGDATA=self.pg_data)  # noqa: S106
+        ports = {"5432": self.local_port}
         print("Starting Postgres container ...", file=sys.stderr)
         # Uniq-ify the name as threaded tests will create multiple containers.
-        name = '{}-{}.{}'.format(self.name, os.getpid(), next(NEXT_ID))
+        name = "{}-{}.{}".format(self.name, os.getpid(), next(NEXT_ID))
         self.container = self.client.containers.run(
             self.image,
             detach=True,
             auto_remove=True,
             environment=env,
             name=name,
-            network_mode='bridge',
+            network_mode="bridge",
             ports=ports,
             remove=True,
         )
@@ -133,7 +135,7 @@ class PostgresContainerFixture(EngineFixture):
         # real free port. We close the socket after determnining which port
         # that was.
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-            s.bind(('localhost', 0))
+            s.bind(("localhost", 0))
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.local_port = s.getsockname()[1]
             print("Using port {}".format(self.local_port), file=sys.stderr)
@@ -148,7 +150,7 @@ class PostgresContainerFixture(EngineFixture):
         )
         c.autocommit = True
         cur = c.cursor()
-        for stmt in self.init_sql.split(';'):
+        for stmt in self.init_sql.split(";"):
             if stmt.strip():
                 cur.execute(stmt)
         cur.close()

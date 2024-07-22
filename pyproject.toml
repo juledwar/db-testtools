@@ -1,3 +1,90 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "db-testtools"
+dynamic = ["version"]
+readme = "README.rst"
+license = "Apache-2.0"
+requires-python = ">=3.8"
+authors = [
+    { name = "Julian Edwards", email = "juledwar@cisco.com" },
+]
+maintainers = [
+    { name = "Julian Edwards", email = "juledwar@cisco.com" },
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Framework :: Hatch",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Natural Language :: English",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Utilities",
+]
+urls.Source = "https://github.com/juledwar/db-testtools"
+
+dependencies = [
+    "docker>=5.0.2",
+    "fixtures>=3.0.0",
+    "psycopg2-binary>=2.9.1",
+    "retry>=0.9.2",
+    "sqlalchemy>=1.4.23",
+    "testresources>=2.0.1",
+]
+[project.optional-dependencies]
+test = [
+    "build>=0.7.0",
+    "coverage[toml]>=6.0.2",
+    "ipython>=7.28.0",
+    "pdbpp>=0.10.3",
+    "ruff>=0.5.3",
+    "sqlalchemy",
+    "stestr>=3.2.1",
+    "testresources",
+    "testscenarios>=0.5.0",
+    "testtools>=2.5.0",
+    "twine>=3.4.2",
+
+]
+
+[tool.hatch.version]
+source = "vcs"
+[tool.hatch.build.hooks.vcs]
+version-file = "dbtesttools/_version.py"
+[tool.hatch.build.targets.sdist]
+include = ["/dbtesttools"]
+exclude = ["tests"]
+
+[tool.hatch.envs.default]
+path = ".hatch"
+features = ["test"]
+
+scripts.debug = ["python -m testtools.run discover -v -s dbtesttools/tests -t {root} -p test*.py {args}"]
+# Concurrency explicitly set to two because:
+#  1. Want to make sure that 1 DB resource is brought up per thread
+#  2. Want to make sure that tests will re-use the same DB resource
+scripts.py3 = ["stestr run --concurrency 2 -t dbtesttools/tests --top-dir {root} {args}"]
+scripts.formatcheck = [
+    "ruff format --check dbtesttools",
+    "ruff check --select I --show-fixes dbtesttools"
+]
+scripts.format = [
+    "ruff check --select I --fix-only --show-fixes dbtesttools",
+    "ruff format dbtesttools",
+]
+scripts.ci = ["py3", "formatcheck"]
+scripts.testpypi = ["twine upload --repository testpypi {args}"]
+scripts.pypi = ["twine upload --repository pypi {args}"]
+
 [tool.coverage.run]
 omit = [
     '*dbtesttools/tests*',

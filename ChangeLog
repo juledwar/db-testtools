@@ -1,6 +1,12 @@
 CHANGES
 =======
 
+2024.07.21
+----------
+* Use Hatch to test and build the project
+* Replace Black with Ruff for formatting and checking
+* Allow overriding of the PG server IP address
+
 2023.01.27
 ----------
 
