@@ -14,7 +14,7 @@ after each test completes.
 Requirements
 ------------
 
-Python 3.7 and beyond should work.
+Python 3.8 and beyond should work.
 
 Quickstart
 ----------
@@ -76,7 +76,8 @@ dropped and re-instated on every test.
 
 The PostgresContainerFixture starts its own Postgres instance in a local
 Docker container. Therefore you must have Docker installed before using
-this fixture.
+this fixture. The Postgres image used by default is 16.3-alpine, but this
+fixture is known to work all the way back to v11.
 
 If you are already running inside Docker you will need to start the
 container with `--network-"host"` so that 127.0.0.1 routes to the started
@@ -90,16 +91,12 @@ PG containers. You will need to do up to two extra things:
     can set the DBTESTTOOLS_PG_IP_ADDR environment variable.
 
 
-Help needed!
-------------
-This fixture suite is currently not tested itself and would benefit from
-anyone willing to contribute some unit tests. However, it has been in
-use daily on a large project at Cisco for a few years now, and is very
-stable.
+This code has been in use daily on a large project at Cisco for a few years
+now, and is very stable.
 
 
 Copyright
 ---------
 
-db-testtools is copyright (c) 2021-2023 Cisco Systems, Inc. and its affiliates
+db-testtools is copyright (c) 2021-2024 Cisco Systems, Inc. and its affiliates
 All rights reserved.
