@@ -75,7 +75,9 @@ scripts.debug = ["python -m testtools.run discover -v -s dbtesttools/tests -t {r
 scripts.py3 = ["stestr run --concurrency 2 -t dbtesttools/tests --top-dir {root} {args}"]
 scripts.formatcheck = [
     "ruff format --check dbtesttools",
-    "ruff check --select I --show-fixes dbtesttools"
+    "ruff check --select I --show-fixes dbtesttools",
+    "hatch build",
+    "twine check dist/*",
 ]
 scripts.format = [
     "ruff check --select I --fix-only --show-fixes dbtesttools",
