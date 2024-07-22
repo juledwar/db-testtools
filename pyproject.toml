@@ -60,8 +60,10 @@ test = [
 source = "vcs"
 [tool.hatch.build.hooks.vcs]
 version-file = "dbtesttools/_version.py"
+[tool.hatch.build.targets.wheel]
+packages = ["dbtesttools"]
 [tool.hatch.build.targets.sdist]
-include = ["/dbtesttools"]
+include = ["dbtesttools"]
 exclude = ["tests"]
 
 [tool.hatch.envs.default]
