@@ -1,6 +1,10 @@
 CHANGES
 =======
 
+2024.11.11
+----------
+* Add expire_on_commit option to sessions
+
 2024.07.21
 ----------
 * Use Hatch to test and build the project
