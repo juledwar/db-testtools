@@ -210,10 +210,17 @@ class SessionFixture(fixtures.Fixture):
     :param debug: If true, send all DB statements emitted to the log.
     """
 
-    def __init__(self, database_fixture, future=False, debug=False):
+    def __init__(
+        self,
+        database_fixture,
+        future=False,
+        debug=False,
+        expire_on_commit=True,
+    ):
         super().__init__()
         self.database = database_fixture
         self.future = future
+        self.expire_on_commit = expire_on_commit
         if debug:
             self.database.engine.echo = True
             from logging import Formatter, getLogger
@@ -228,7 +235,7 @@ class SessionFixture(fixtures.Fixture):
         self.connection = self.database.connect()
         self.txn = self.connection.begin()
         self.configure_session()
-        self.session = self.Session()
+        self.session = self.Session(expire_on_commit=self.expire_on_commit)
         # Even if the DB won't do savepoints, begin a nested transaction
         # anyway. This makes SQLite tests pass.
         self.set_up_savepoint()
