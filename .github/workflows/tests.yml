@@ -1,30 +1,99 @@
-name: Run tests
+name: Run parallel tests
 
-on: ["push", "pull_request"]
+on: [push, pull_request]
 
 jobs:
-
-  test:
-
+  docker-tests:
+    name: Docker Tests / Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install hatch
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install hatch
 
-    - name: Run tests
-      run: |
-        hatch run ci
+      - name: Install Docker CE
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ca-certificates \
+            curl \
+            gnupg \
+            lsb-release
+          sudo mkdir -p /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+            $(lsb_release -cs) stable" | \
+            sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+          sudo systemctl start docker
+          docker --version
 
+      - name: Run Docker scenario tests
+        run: |
+          hatch run ci -- dbtesttools.tests.test_pgfixture_docker dbtesttools.tests.test_isolation
+
+  podman-tests:
+    name: Podman Tests / Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install hatch
+
+      - name: Install Podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman
+          podman --version
+
+      - name: Start Podman API (rootless)
+        run: |
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          sudo mkdir -p "$XDG_RUNTIME_DIR"
+          sudo chown $(id -u):$(id -g) "$XDG_RUNTIME_DIR"
+          mkdir -p "$XDG_RUNTIME_DIR"
+          nohup podman system service --time=0 unix://$XDG_RUNTIME_DIR/podman/podman.sock > podman-api.log 2>&1 &
+          echo "Waiting for podman.sock..."
+          for i in {1..10}; do
+            if podman info > /dev/null 2>&1; then
+              echo "Podman is up"
+              break
+            fi
+            sleep 2
+          done
+          cat podman-api.log
+          if ! podman info > /dev/null 2>&1; then
+            echo "::error ::Podman API service failed to start"
+            cat podman-api.log
+            exit 1
+          fi
+
+      - name: Run Podman scenario tests
+        run: |
+          hatch run ci -- dbtesttools.tests.test_pgfixture_podman dbtesttools.tests.test_isolation

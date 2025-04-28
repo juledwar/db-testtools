@@ -90,6 +90,26 @@ class PostgresContainerFixture(EngineFixture):
     def setUp(self):
         """Do all the work to bring up a working Postgres fixture."""
         super().setUp()
+        # Podman integration: optionally override Docker socket
+        if os.getenv("DBTESTTOOLS_USE_PODMAN") == "1":
+            if sys.platform == "darwin":
+                # MacOS Podman socket
+                podman_socket = (
+                    f"unix://{os.getenv('HOME')}"
+                    f"/.local/share/containers/podman/machine/podman.sock"
+                )
+            else:
+                # Linux Podman socket
+                podman_socket = (
+                    f"unix:///run/user/{os.getuid()}/podman/podman.sock"
+                )
+            if os.path.exists(podman_socket.replace("unix://", "")):
+                os.environ["DOCKER_HOST"] = podman_socket
+            else:
+                raise FileNotFoundError(
+                    f"Podman socket not found at {podman_socket}"
+                )
+
         self.client = docker.from_env()
         self.pull_image()
         self.find_free_port()
@@ -156,7 +176,7 @@ class PostgresContainerFixture(EngineFixture):
         cur.close()
         c.close()
 
-    @retry(psycopg2.OperationalError, tries=30, delay=1)
+    @retry(psycopg2.OperationalError, tries=60, delay=1)
     def wait_for_pg_start(self):
         c = psycopg2.connect(
             "user='postgres' host='{ip}' port='{port}'"
