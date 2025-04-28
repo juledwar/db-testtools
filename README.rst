@@ -92,6 +92,9 @@ PG containers. You will need to do up to two extra things:
     can set the DBTESTTOOLS_PG_IP_ADDR environment variable.
 
 
+If you want to use Podman instead of Docker engine you will need to 
+`export USE_PODMAN=1` variable. 
+
 This code has been in use daily on a large project at Cisco for a few years
 now, and is very stable.
 
