@@ -1,8 +1,9 @@
 import unittest
 import warnings
 
-from dbtesttools.engines.postgres import PostgresContainerFixture
 from sqlalchemy import text
+
+from dbtesttools.engines.postgres import PostgresContainerFixture
 
 warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
 
