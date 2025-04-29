@@ -143,10 +143,6 @@ class PostgresContainerFixture(EngineFixture):
             ports=ports,
             remove=True,
         )
-        if os.getenv("USE_PODMAN") == "1":
-            import time
-
-            time.sleep(5)
 
     def find_free_port(self):
         """Find a free port on which to run Postgres locally."""
