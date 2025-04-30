@@ -1,34 +1,58 @@
-import unittest
+import os
 import warnings
 
-from sqlalchemy import text
 
+import testscenarios
+import testtools
+import unittest
+
+from sqlalchemy import text
 from dbtesttools.engines.postgres import PostgresContainerFixture
 
 warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
 
 
-class TestPostgresContainer(unittest.TestCase):
+class TestPostgresContainer(
+    testscenarios.TestWithScenarios, testtools.TestCase
+):
     """Test that we can bring up a Postgres container."""
 
+    scenarios = [
+        ("docker", {"podman": False}),
+        ("podman", {"podman": True}),
+    ]
+
     def setUp(self):
-        # Create a Postgres fixture
-        self.pg_fixture = PostgresContainerFixture(future=True)
-        self.pg_fixture.setUp()
+        self.pg_fixture = None
+        super().setUp()
+        if self.podman:
+            os.environ["DBTESTTOOLS_USE_PODMAN"] = "1"
+        else:
+            os.environ.pop("DBTESTTOOLS_USE_PODMAN", None)
+        try:
+            fixture = PostgresContainerFixture(future=True)
+            fixture.setUp()
+            self.pg_fixture = fixture
+        except Exception as e:
+            print(f'[ERROR] Failed to start Postgres fixture: {e}')
 
     def tearDown(self):
-        if hasattr(self.pg_fixture, "engine"):
-            try:
-                self.pg_fixture.engine.dispose()
-            except Exception as e:
-                print(f"Warning: failed to dispose engine: {e}")
-        if hasattr(self.pg_fixture, "container"):
-            try:
-                self.pg_fixture.container.kill()
-            except Exception as e:
-                print(f"Warning: failed to kill container: {e}")
+        if self.pg_fixture is not None:
+            if hasattr(self.pg_fixture, "engine"):
+                try:
+                    self.pg_fixture.engine.dispose()
+                except Exception as e:
+                    print(f"Warning: failed to dispose engine: {e}")
+            if hasattr(self.pg_fixture, "container"):
+                try:
+                    self.pg_fixture.container.kill()
+                except Exception as e:
+                    print(f"Warning: failed to kill container: {e}")
+        super().tearDown()
 
     def test_connection(self):
+        if self.pg_fixture is None:
+            self.fail("Postgres fixtire was not initialized")
         # Actually test that the database is reachable
         conn = self.pg_fixture.connect()
         try:
