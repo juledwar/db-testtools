@@ -1,3 +1,4 @@
+import sqlalchemy as sa
 import testresources
 import testscenarios
 import testtools
@@ -12,13 +13,12 @@ class DBTestCaseSqlite(testresources.ResourcedTestCase, testtools.TestCase):
         ModelBase,
         "dbtesttools.tests.models",
         engine_fixture_name="SqliteMemoryFixture",
-        future=True,
     )
     resources = [("database", db_fixture)]
 
     def setUp(self):
         super().setUp()
-        self.session_fixture = SessionFixture(self.database, future=True)
+        self.session_fixture = SessionFixture(self.database)
         self.useFixture(self.session_fixture)
         self.session = self.session_fixture.session
 
@@ -28,13 +28,12 @@ class DBTestCasePostgres(testresources.ResourcedTestCase, testtools.TestCase):
         ModelBase,
         "dbtesttools.tests.models",
         engine_fixture_name="PostgresContainerFixture",
-        future=True,
     )
     resources = [("database", db_fixture)]
 
     def setUp(self):
         super().setUp()
-        self.session_fixture = SessionFixture(self.database, future=True)
+        self.session_fixture = SessionFixture(self.database)
         self.useFixture(self.session_fixture)
         self.session = self.session_fixture.session
 
@@ -138,3 +137,42 @@ class TestIsolationPostrgres(
         self.session.add(TestModel(name="test", value=1))
         self.session.commit()
         self.assertEqual(self.session.scalar(func.count(TestModel.id)), 1)
+
+
+class SessionBehaviourMixin:
+    """Behaviour of the session within a single test."""
+
+    def count(self):
+        return self.session.scalar(func.count(TestModel.id))
+
+    def test_session_is_bound_to_test_connection(self):
+        bind = self.session.get_bind()
+        self.assertIsInstance(bind, sa.engine.Connection)
+        self.assertIs(self.session_fixture.connection, bind)
+        self.assertIs(self.database.engine, bind.engine)
+
+    def test_rollback_keeps_earlier_commit(self):
+        self.session.add(TestModel(name="committed", value=1))
+        self.session.commit()
+        self.session.add(TestModel(name="discarded", value=2))
+        self.session.flush()
+        self.assertEqual(2, self.count())
+        self.session.rollback()
+        self.assertEqual(1, self.count())
+        # The savepoint is restarted, so the session is still usable.
+        self.session.add(TestModel(name="committed again", value=3))
+        self.session.commit()
+        self.assertEqual(
+            ["committed", "committed again"],
+            self.session.scalars(
+                sa.select(TestModel.name).order_by(TestModel.id)
+            ).all(),
+        )
+
+
+class TestSessionSqlite(SessionBehaviourMixin, DBTestCaseSqlite):
+    pass
+
+
+class TestSessionPostgres(SessionBehaviourMixin, DBTestCasePostgres):
+    pass

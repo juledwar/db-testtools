@@ -2,9 +2,26 @@
 # All rights reserved.
 
 import abc
+import warnings
 
 import fixtures
 import sqlalchemy as sa
+
+
+def warn_future_deprecated(future, stacklevel=3):
+    """Warn if the obsolete `future` argument was passed.
+
+    SQLAlchemy 2 is always in "future" (v2) mode, so the argument no longer
+    has any effect.
+    """
+    if future is not None:
+        warnings.warn(
+            "The 'future' argument is deprecated and ignored; "
+            "db-testtools now requires SQLAlchemy 2, which always uses "
+            "the v2 API.",
+            DeprecationWarning,
+            stacklevel=stacklevel,
+        )
 
 
 class EngineFixture(fixtures.Fixture, metaclass=abc.ABCMeta):
