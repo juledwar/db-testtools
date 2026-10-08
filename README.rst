@@ -14,7 +14,21 @@ after each test completes.
 Requirements
 ------------
 
-Python 3.8 and beyond should work.
+Python 3.10 and beyond should work. SQLAlchemy 2.0 or later is required.
+
+Upgrading from SQLAlchemy 1.4 versions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Older releases supported SQLAlchemy's legacy (v1) API, which was the
+default unless `future=True` was passed. This is no longer supported:
+
+ - The `future` argument is deprecated and ignored, and emits a
+   `DeprecationWarning` if passed. Remove it from your
+   `DatabaseResource`, `SessionFixture` and engine fixture arguments.
+ - The test session is always bound to a `Connection` that is rolled back
+   at the end of each test, rather than to the `Engine`. If your code
+   expects `session.bind` or `session.get_bind()` to be an `Engine`, use
+   `session.get_bind().engine` instead.
 
 Quickstart
 ----------
@@ -38,14 +52,13 @@ Example base test class:
        db_fixture = DatabaseResource(
            ModelBase,
            'myproject.models',
-           future=True,
        )
        resources = [('database', db_fixture)]
 
        def setUp(self):
            super().setUp()
 
-           self.session_fixture = SessionFixture(self.database, future=True)
+           self.session_fixture = SessionFixture(self.database)
            self.useFixture(self.session_fixture)
            # The session itself.
            self.session = self.session_fixture.session
@@ -101,6 +114,27 @@ these steps:
     systemctl --user start podman
     ```
     2. `export DBTESTTOOLS_USE_PODMAN=1` variable.
+
+Postgres DB-API driver
+~~~~~~~~~~~~~~~~~~~~~~
+
+The PostgresContainerFixture can use either psycopg2 (installed by
+default) or psycopg v3. To install psycopg v3 support::
+
+    pip install db-testtools[psycopg3]
+
+The driver is chosen in this order:
+
+ 1. The `driver` argument to `PostgresContainerFixture`, which may be
+    `'psycopg2'` or `'psycopg'` (`'psycopg3'` is accepted as an alias).
+    When using `DatabaseResource`, pass it via `engine_fixture_kwargs`,
+    e.g. `engine_fixture_kwargs={'driver': 'psycopg'}`.
+ 2. The `DBTESTTOOLS_PG_DRIVER` environment variable, with the same
+    values as above.
+ 3. Auto-detection: psycopg2 if it is installed, otherwise psycopg v3.
+
+The SQLAlchemy engine is created with the matching dialect
+(`postgresql+psycopg2` or `postgresql+psycopg`).
 
 This code has been in use daily on a large project at Cisco for a few years
 now, and is very stable.

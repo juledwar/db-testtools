@@ -11,6 +11,8 @@ import fixtures
 import sqlalchemy as sa
 import testresources
 
+from dbtesttools.baseengine import warn_future_deprecated
+
 models_loaded = False
 
 
@@ -49,14 +51,13 @@ class DatabaseResource(testresources.TestResourceManager):
     :param engine_fixture_kwargs: A dict of kwargs to pass to the above engine
         fixture when it is instantiated.
 
-    :param future: (bool) Passed to the engine fixture when instantiating; used
-        to activate future mode on the SQLAlchemy engine (v2 mode).
+    :param future: Deprecated and ignored; SQLAlchemy 2 always uses the
+        v2 API.
 
     :param patch_query_property: If True, override the `query` property on
         ModelBase so that it uses the Session registry's `query_property`.
         If your code does things like `FooModel.query.filter_by()` then you
-        need this. `Query` is deprecated as of SQLAlchemy 1.4 which introduces
-        the new v2 API.
+        need this. `Query` is a legacy API in SQLAlchemy 2.
         DEFAULT: False
 
     :param sessionmaker_class: Any custom class for SQLAlchemy's sessionmaker.
@@ -73,7 +74,7 @@ class DatabaseResource(testresources.TestResourceManager):
         engine_fixture_name="SqliteMemoryFixture",
         sessionmaker_class=None,
         engine_fixture_kwargs=None,
-        future=False,
+        future=None,
     ):
         super().__init__()
         self.models_module = models_module
@@ -82,8 +83,7 @@ class DatabaseResource(testresources.TestResourceManager):
         self.engine_fixture_name = engine_fixture_name
         self.sessionmaker_class = sessionmaker_class
         self.engine_fixture_kwargs = engine_fixture_kwargs or {}
-        self.future = future
-        self.engine_fixture_kwargs["future"] = self.future
+        warn_future_deprecated(future)
 
     def make(self, dep_resources):
         print("Creating new database resource...", file=sys.stderr)
@@ -137,7 +137,7 @@ class DatabaseResource(testresources.TestResourceManager):
             session_factory, scopefunc=self.session_id
         )
 
-        # If still using the v1 Query API, optionally patch in a query
+        # If still using the legacy Query API, optionally patch in a query
         # property on the ModelBase.
         if self.patch_query_property:
             self.ModelBase.query = self.Session.query_property()
@@ -206,20 +206,21 @@ class SessionFixture(fixtures.Fixture):
     scope functions.
 
     :param database_fixture: An initialised DatabaseResource object
-    :param future: Future (v2) mode, passed directly to the engine and session
+    :param future: Deprecated and ignored; SQLAlchemy 2 always uses the
+        v2 API.
     :param debug: If true, send all DB statements emitted to the log.
     """
 
     def __init__(
         self,
         database_fixture,
-        future=False,
+        future=None,
         debug=False,
         expire_on_commit=True,
     ):
         super().__init__()
         self.database = database_fixture
-        self.future = future
+        warn_future_deprecated(future)
         self.expire_on_commit = expire_on_commit
         if debug:
             self.database.engine.echo = True
@@ -244,17 +245,8 @@ class SessionFixture(fixtures.Fixture):
 
     def configure_session(self):
         """Set up a pre-configured Session factory object."""
-        if self.future:
-            # v2 API binds via the connection
-            self.database.Session.configure(
-                future=self.future, bind=self.connection
-            )
-        # v1 API binds via the engine
-        else:
-            self.database.Session.configure(
-                future=self.future,
-                bind=self.database.engine,
-            )
+        # Bind to the connection so the session joins its outer transaction.
+        self.database.Session.configure(bind=self.connection)
 
     @property
     def Session(self):
@@ -268,28 +260,17 @@ class SessionFixture(fixtures.Fixture):
         # isolation, and the inner savepoint is automatically recreated
         # if any test commits or rolls back. This ensures that the outer
         # txn is never touched by tests (or code called by tests).
-        if self.future:
-            # V2 API uses connections for nesting
-            self.start_savepoint()
-        else:
-            # V1 API uses sessions for nesting
-            self.session.begin_nested()
+        self.start_savepoint()
 
         @sa.event.listens_for(self.session, "after_transaction_end")
         def restart_savepoint(session, transaction):
-            if self.future:
-                if not self.savepoint.is_active:
-                    self.start_savepoint()
-            elif transaction.nested and not transaction._parent.nested:
-                session.expire_all()
-                session.begin_nested()
+            if not self.savepoint.is_active:
+                self.start_savepoint()
 
     def start_savepoint(self):
-        # In SQLAlchemy v2 API, commiting a session with an active
-        # savepoint commits the outer transaction. In v1 it just
-        # committed the savepoint. The outer transaction on the connection
-        # is now outside of the session itself so any session commits
-        # will just result in a savepoint release.
+        # The savepoint is created on the connection, outside of the
+        # session, so any session commits will just result in a savepoint
+        # release rather than committing the outer transaction.
         self.savepoint = self.connection.begin_nested()
 
     def clean_session(self):

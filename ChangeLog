@@ -1,6 +1,23 @@
 CHANGES
 =======
 
+UNRELEASED
+----------
+* Add support for psycopg v3 as an alternative Postgres driver, selected
+  with the `driver` argument to PostgresContainerFixture or the
+  DBTESTTOOLS_PG_DRIVER environment variable
+* BREAKING: Require SQLAlchemy 2.0 or later and remove support for the
+  legacy (v1) API. SessionFixture sessions are now always bound to the test's
+  Connection rather than the Engine, which was previously the default
+  (`future=False`). Code that expects `session.bind` or `session.get_bind()`
+  to be an Engine should use `session.get_bind().engine` instead
+* The `future` argument to DatabaseResource, SessionFixture,
+  SqliteMemoryFixture and PostgresContainerFixture is deprecated and ignored;
+  passing it emits a DeprecationWarning
+* BREAKING: Drop support for Python 3.8 and 3.9, and add Python 3.14
+* Stop leaking the Postgres container if PostgresContainerFixture fails to
+  set up after starting it
+
 2024.11.11
 ----------
 * Add expire_on_commit option to sessions
