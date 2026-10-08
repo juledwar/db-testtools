@@ -1,7 +1,7 @@
 CHANGES
 =======
 
-UNRELEASED
+2026.10.08
 ----------
 * Add support for psycopg v3 as an alternative Postgres driver, selected
   with the `driver` argument to PostgresContainerFixture or the
